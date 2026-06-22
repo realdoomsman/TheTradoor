@@ -38,7 +38,7 @@ const FAQS: FaqItem[] = [
   },
   {
     q: 'what is the CA?',
-    a: 'coming soon. follow us on X for the announcement.',
+    a: 'H6qoigb4sdnYvpMUbDyWZah8APB2firuyQNfNjgKpump — verify on solscan.io',
   },
   {
     q: 'is this a rug?',

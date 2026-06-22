@@ -149,7 +149,7 @@ function TopBar({ solPrice, walletSol }: { solPrice: number; walletSol: number }
       <div className="top-bar-sep" />
 
       <div className="top-bar-item">
-        CA <span className="value" style={{ color: '#ffaa00' }}>coming soon</span>
+        CA <a href="https://solscan.io/token/H6qoigb4sdnYvpMUbDyWZah8APB2firuyQNfNjgKpump" target="_blank" rel="noopener noreferrer" className="value" style={{ color: '#00ff41', cursor: 'pointer', textDecoration: 'none' }}>H6qo...pump</a>
       </div>
 
       <div className="top-bar-item" style={{ marginLeft: 'auto' }}>
