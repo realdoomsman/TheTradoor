@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// Raw transaction log — every parsed tx from Helius
+model Transaction {
+  id              String   @id @default(cuid())
+  signature       String   @unique
+  blockTime       Int
+  type            String   // SWAP | TRANSFER | BURN | TAX_INFLOW | UNKNOWN
+  source          String   // JUPITER | RAYDIUM | SYSTEM | etc.
+  feeLamports     Int
+  memo            String?
+  rawJson         String   // Full Helius parsed JSON (stored as text)
+  processed       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  tradeEntryFor   Trade?   @relation("EntryTx")
+  tradeExitFor    Trade?   @relation("ExitTx")
+  burnRecord      Burn?
+  taxInflow       TaxInflow?
+}
+
+/// Bundled trade record (entry + exit paired)
+model Trade {
+  id              String   @id @default(cuid())
+  tokenMint       String
+  tokenSymbol     String
+  tokenName       String?
+  action          String   // OPEN | CLOSED
+
+  // Entry data
+  entryTxId       String?  @unique
+  entryTx         Transaction? @relation("EntryTx", fields: [entryTxId], references: [id])
+  entryTimestamp   Int
+  entrySolAmount  Float
+  entryMarketCap  Float?
+  entryPrice      Float?
+
+  // Exit data (null if still open)
+  exitTxId        String?  @unique
+  exitTx          Transaction? @relation("ExitTx", fields: [exitTxId], references: [id])
+  exitTimestamp   Int?
+  exitSolAmount   Float?
+  exitMarketCap   Float?
+  exitPrice       Float?
+
+  // Computed
+  netPnlSol       Float?
+  roiPercent       Float?
+  holdDurationSec  Int?
+  archiveTag       String?  // HIMOTHY | PROFIT | REKT
+  traderMemo       String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+/// Verified burn transactions
+model Burn {
+  id              String   @id @default(cuid())
+  transactionId   String   @unique
+  transaction     Transaction @relation(fields: [transactionId], references: [id])
+  timestamp       Int
+  tradoorAmount   Float
+  solValueAtBurn  Float
+  usdValueAtBurn  Float?
+  jupiterRouteJson String?
+  createdAt       DateTime @default(now())
+}
+
+/// Tax inflow micro-transactions
+model TaxInflow {
+  id              String   @id @default(cuid())
+  transactionId   String   @unique
+  transaction     Transaction @relation(fields: [transactionId], references: [id])
+  timestamp       Int
+  solAmount       Float
+  createdAt       DateTime @default(now())
+}
+
+/// Cached global metrics (computed periodically)
+model GlobalMetrics {
+  id                    String   @id @default("singleton")
+  totalWalletValueSol   Float    @default(0)
+  totalWalletValueUsd   Float    @default(0)
+  totalSolProfitGenerated Float  @default(0)
+  lifetimeRoiPercent    Float    @default(0)
+  profitFactor          Float    @default(0)
+  winRate               Float    @default(0)
+  totalTradesClosed     Int      @default(0)
+  totalWins             Int      @default(0)
+  totalLosses           Int      @default(0)
+  totalTradoorBurned    Float    @default(0)
+  burnSupplyPercent     Float    @default(0)
+  taxInflowRateSolHr    Float    @default(0)
+  lastUpdated           DateTime @default(now())
+}

@@ -1,26 +1,538 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --font-mono: var(--font-fira-code), "Fira Code", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --color-bg: #121212;
+  --color-fg: #d0d0d0;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ══════════════════════════════════════════════
+   TheTradoor.fun — DEGEN TERMINAL v2
+   ══════════════════════════════════════════════ */
+
+/* ── Base ── */
+html, body {
+  background: #121212;
+  color: #d0d0d0;
+  overflow: hidden;
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* { border-radius: 0 !important; }
+
+::selection { background: #00ff41; color: #000; }
+
+/* ── Scrollbars ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; }
+::-webkit-scrollbar-thumb:hover { background: #333; }
+
+/* ══════ DESKTOP ══════ */
+.desktop-bg {
+  background: #121212;
+  position: relative;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* subtle dot grid */
+.desktop-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+/* ambient glow */
+.desktop-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 30%, rgba(0, 255, 65, 0.015) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(74, 154, 255, 0.01) 0%, transparent 40%);
+  pointer-events: none;
+}
+
+/* ══════ TOP STATUS BAR ══════ */
+.top-bar {
+  background: #181818;
+  border-bottom: 1px solid #252525;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 12px;
+  z-index: 10000;
+  position: relative;
+}
+
+.top-bar-brand {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #00ff41;
+  text-transform: uppercase;
+}
+
+.top-bar-sep {
+  width: 1px;
+  height: 16px;
+  background: #252525;
+}
+
+.top-bar-item {
+  font-size: 10px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.top-bar-item span.value {
+  color: #aaa;
+  font-weight: bold;
+}
+.top-bar-item span.live {
+  color: #00ff41;
+}
+
+/* ══════ SIDEBAR DOCK ══════ */
+.dock {
+  background: #181818;
+  border-right: 1px solid #252525;
+  width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 2px;
+  z-index: 5;
+  position: relative;
+}
+
+.dock-item {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  gap: 3px;
+  position: relative;
+  transition: background 0.1s;
+}
+.dock-item:hover {
+  background: rgba(0, 255, 65, 0.06);
+}
+.dock-item:hover .dock-icon {
+  color: #00ff41;
+  border-color: #00ff41;
+  box-shadow: 0 0 8px rgba(0,255,65,0.15) !important;
+}
+.dock-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 900;
+  color: #999;
+  border: 1px solid #2a2a2a;
+  background: #191919;
+  transition: all 0.15s;
+}
+.dock-label {
+  font-size: 7px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  line-height: 1;
+}
+
+.dock-divider {
+  width: 32px;
+  height: 1px;
+  background: #252525;
+  margin: 4px 0;
+}
+
+/* ══════ WINDOW ══════ */
+.window-frame {
+  background: #191919;
+  border: 1px solid #2a2a2a;
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.7),
+    0 0 1px rgba(0, 255, 65, 0.05) !important;
+  display: flex;
+  flex-direction: column;
+}
+.window-frame-active {
+  border-color: #2a2a2a;
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.8),
+    0 0 1px rgba(0, 255, 65, 0.1),
+    inset 0 1px 0 rgba(255,255,255,0.02) !important;
+}
+
+.window-titlebar {
+  background: #1e1e1e;
+  border-bottom: 1px solid #252525;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: grab;
+  height: 34px;
+  min-height: 34px;
+}
+.window-titlebar:active { cursor: grabbing; }
+
+.window-titlebar-inactive {
+  background: #191919;
+}
+
+.window-icon {
+  font-size: 10px;
+  font-weight: 900;
+  color: #00ff41;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #2a2a2a;
+  background: #181818;
+  flex-shrink: 0;
+}
+
+.window-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: #aaa;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  text-transform: lowercase;
+}
+
+.window-title-inactive {
+  color: #666;
+}
+
+.window-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #1e1e1e;
+  padding: 16px;
+}
+
+/* ── Window Buttons ── */
+.win-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.win-btn {
+  width: 12px;
+  height: 12px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  background: #333;
+  color: transparent;
+  transition: all 0.1s;
+}
+.win-btn:hover {
+  color: #fff;
+}
+.win-btn-min { background: #444; }
+.win-btn-min:hover { background: #888; }
+.win-btn-max { background: #444; }
+.win-btn-max:hover { background: #888; }
+.win-btn-close { background: #444; }
+.win-btn-close:hover { background: #ff3333; }
+
+/* ══════ TASKBAR ══════ */
+.taskbar {
+  background: #121212;
+  border-top: 1px solid #252525;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  gap: 4px;
+  z-index: 9999;
+}
+
+.start-btn {
+  background: #00ff41;
+  border: none;
+  color: #000;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 4px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  transition: all 0.1s;
+}
+.start-btn:hover {
+  background: #33ff66;
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.25) !important;
+}
+
+.taskbar-sep {
+  width: 1px;
+  height: 18px;
+  background: #252525;
+  margin: 0 4px;
+}
+
+.taskbar-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #999;
+  font-size: 10px;
+  padding: 3px 10px;
+  cursor: pointer;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: all 0.1s;
+}
+.taskbar-btn:hover {
+  background: #1e1e1e;
+  color: #aaa;
+}
+.taskbar-btn-active {
+  background: #1e1e1e;
+  color: #00ff41;
+  border-color: #252525;
+}
+
+/* Taskbar live ticker */
+.taskbar-ticker {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 10px;
+  color: #666;
+  padding-right: 4px;
+}
+.taskbar-ticker .sol-price {
+  color: #00ff41;
+  font-weight: bold;
+}
+.taskbar-ticker .network {
+  color: #999;
+}
+
+.taskbar-clock {
+  padding-left: 10px;
+  font-size: 10px;
+  color: #999;
+  border-left: 1px solid #252525;
+  height: 18px;
+  display: flex;
+  align-items: center;
+}
+
+/* ══════ CONTENT ══════ */
+.info-box {
+  background: #191919;
+  border: 1px solid #252525;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.info-box-warn {
+  background: #141005;
+  border-color: #2a2000;
+  border-left: 2px solid #ffaa00;
+}
+.info-box-success {
+  background: #051405;
+  border-color: #0a2a0a;
+  border-left: 2px solid #00ff41;
+}
+.info-box-highlight {
+  background: #050a14;
+  border-color: #0a1a2a;
+  border-left: 2px solid #4a9aff;
+}
+
+.text-dim { color: #999; }
+.text-mid { color: #999; }
+.text-accent { color: #4a9aff; }
+.text-profit { color: #00ff41; }
+.text-loss { color: #ff3333; }
+.text-gold { color: #ffaa00; }
+
+.label-tag {
+  font-size: 8px;
+  padding: 1px 6px;
+  border: 1px solid;
+  letter-spacing: 0.1em;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.btn-green {
+  background: #00ff41;
+  border: none;
+  color: #000;
+  font-weight: 900;
+  padding: 5px 16px;
+  cursor: pointer;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  transition: all 0.15s;
+}
+.btn-green:hover {
+  background: #33ff66;
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.25) !important;
+}
+
+/* ══════ ANIMATIONS ══════ */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.cursor-blink { animation: blink 1s step-end infinite; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
+  50% { opacity: 0.3; box-shadow: none; }
+}
+.pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+
+@keyframes glow-pulse {
+  0%, 100% { text-shadow: 0 0 8px currentColor; }
+  50% { text-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
+}
+.glow-text { animation: glow-pulse 3s ease-in-out infinite; }
+
+@keyframes subtle-flicker {
+  0%, 97%, 100% { opacity: 1; }
+  98% { opacity: 0.95; }
+  99% { opacity: 0.98; }
+}
+
+/* scrolling ticker */
+@keyframes scroll-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.scroll-ticker {
+  animation: scroll-left 30s linear infinite;
+  display: flex;
+  gap: 24px;
+  white-space: nowrap;
+}
+
+/* scanlines */
+.scanlines::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  z-index: 99999;
+}
+
+/* ══════ TERMINAL TEXT ══════ */
+.terminal-line {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #999;
+}
+.terminal-line::before {
+  content: '> ';
+  color: #00ff41;
+}
+
+/* ══════ BADGES ══════ */
+.badge-profit {
+  background: rgba(0, 255, 65, 0.08);
+  border: 1px solid rgba(0, 255, 65, 0.2);
+  color: #00ff41;
+  padding: 1px 8px;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.badge-loss {
+  background: rgba(255, 50, 50, 0.08);
+  border: 1px solid rgba(255, 50, 50, 0.2);
+  color: #ff3333;
+  padding: 1px 8px;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.badge-legendary {
+  background: rgba(255, 170, 0, 0.08);
+  border: 1px solid rgba(255, 170, 0, 0.25);
+  color: #ffaa00;
+  padding: 1px 8px;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(255, 170, 0, 0.3);
+}
+
+/* ══════ MISC ══════ */
+.table-row-hover { transition: background-color 0.1s; }
+.table-row-hover:hover { background-color: #141414; }
+
+.section-divider {
+  border: none;
+  height: 1px;
+  background: #252525;
+  margin: 16px 0;
+}
+
+/* Stat card with hover */
+.stat-card {
+  background: #191919;
+  border: 1px solid #252525;
+  padding: 12px;
+  transition: all 0.15s;
+}
+.stat-card:hover {
+  border-color: #2a2a2a;
+  background: #1e1e1e;
 }
