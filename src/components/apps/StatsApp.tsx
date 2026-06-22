@@ -1,6 +1,8 @@
 'use client';
 
 import { useMetrics } from '@/hooks/use-metrics';
+import { useWallet } from '@/hooks/use-wallet';
+import { useLiveTrades } from '@/hooks/use-live-trades';
 
 function progressBar(percent: number, width: number = 10): string {
   const filled = Math.round((percent / 100) * width);
@@ -9,14 +11,22 @@ function progressBar(percent: number, width: number = 10): string {
 }
 
 export function StatsApp() {
-  const { data: metrics, isLoading } = useMetrics();
+  const { data: metrics, isLoading: metricsLoading } = useMetrics();
+  const { data: wallet, isLoading: walletLoading } = useWallet();
+  const { data: liveTrades } = useLiveTrades();
 
+  const walletSol = wallet?.balanceSol ?? 0;
+  const walletUsd = wallet?.balanceUsd ?? 0;
+  const openPositions = liveTrades?.length ?? 0;
   const winRate = metrics?.winRate ?? 0;
   const profitFactor = metrics?.profitFactor ?? 0;
   const totalWins = metrics?.totalWins ?? 0;
   const totalLosses = metrics?.totalLosses ?? 0;
   const tradesClosed = metrics?.totalTradesClosed ?? 0;
   const lifetimeRoi = metrics?.lifetimeRoiPercent ?? 0;
+  const totalProfit = metrics?.totalSolProfitGenerated ?? 0;
+
+  const isLoading = metricsLoading || walletLoading;
 
   if (isLoading) {
     return (
@@ -26,7 +36,10 @@ export function StatsApp() {
     );
   }
 
-  const roiVerdict = lifetimeRoi >= 100 ? 'absolutely based'
+  const hasClosedTrades = tradesClosed > 0;
+
+  const roiVerdict = !hasClosedTrades ? 'awaiting first closed trade'
+    : lifetimeRoi >= 100 ? 'absolutely based'
     : lifetimeRoi >= 50 ? 'pretty based'
     : lifetimeRoi >= 10 ? 'doing ok'
     : lifetimeRoi >= 0 ? 'surviving'
@@ -35,26 +48,61 @@ export function StatsApp() {
 
   return (
     <div className="font-mono space-y-4">
-      {/* Big ROI */}
-      <div className="text-center py-4">
+      {/* Treasury Value */}
+      <div className="text-center py-3">
         <div className="text-[10px] tracking-widest text-dim uppercase mb-2">
+          treasury value
+        </div>
+        <div className="text-[32px] font-black leading-none text-profit glow-text">
+          {walletSol.toFixed(3)} SOL
+        </div>
+        <div className="text-[13px] text-mid mt-1">
+          ${walletUsd.toFixed(2)} USD
+        </div>
+      </div>
+
+      <div className="border-t border-[#2a2a2a]" />
+
+      {/* Status row */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="info-box text-center">
+          <div className="text-[10px] text-dim uppercase tracking-wider mb-1">open</div>
+          <div className="text-lg font-bold text-profit">{openPositions}</div>
+        </div>
+        <div className="info-box text-center">
+          <div className="text-[10px] text-dim uppercase tracking-wider mb-1">closed</div>
+          <div className="text-lg font-bold text-[#ddd]">{tradesClosed}</div>
+        </div>
+        <div className="info-box text-center">
+          <div className="text-[10px] text-dim uppercase tracking-wider mb-1">profit</div>
+          <div className={`text-lg font-bold ${totalProfit >= 0 ? 'text-profit' : 'text-loss'}`}>
+            {totalProfit >= 0 ? '+' : ''}{totalProfit.toFixed(2)}
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-[#2a2a2a]" />
+
+      {/* ROI */}
+      <div className="text-center py-2">
+        <div className="text-[10px] tracking-widest text-dim uppercase mb-1">
           lifetime roi
         </div>
         <div
-          className={`text-[36px] font-black leading-none glow-text ${
+          className={`text-[28px] font-black leading-none glow-text ${
             lifetimeRoi >= 0 ? 'text-profit' : 'text-loss'
           }`}
         >
           {lifetimeRoi >= 0 ? '+' : ''}{lifetimeRoi.toFixed(1)}%
         </div>
-        <div className="text-[11px] text-dim mt-2">
+        <div className="text-[10px] text-dim mt-1">
           {roiVerdict}
         </div>
       </div>
 
       <div className="border-t border-[#2a2a2a]" />
 
-      {/* 2x3 Grid */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-2">
         <div className="info-box">
           <div className="text-[10px] text-dim uppercase tracking-wider mb-1">win rate</div>
@@ -75,18 +123,6 @@ export function StatsApp() {
         <div className="info-box">
           <div className="text-[10px] text-dim uppercase tracking-wider mb-1">losses</div>
           <div className="text-lg font-bold text-loss">{totalLosses}</div>
-        </div>
-
-        <div className="info-box">
-          <div className="text-[10px] text-dim uppercase tracking-wider mb-1">total closed</div>
-          <div className="text-lg font-bold text-[#ddd]">{tradesClosed}</div>
-        </div>
-
-        <div className="info-box">
-          <div className="text-[10px] text-dim uppercase tracking-wider mb-1">w/l ratio</div>
-          <div className="text-lg font-bold text-[#ddd]">
-            {totalLosses > 0 ? (totalWins / totalLosses).toFixed(1) : totalWins.toString()}
-          </div>
         </div>
       </div>
     </div>
