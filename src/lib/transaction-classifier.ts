@@ -80,7 +80,11 @@ function isSwapTransaction(tx: HeliusTransaction): boolean {
   if (
     tx.source === 'JUPITER' ||
     tx.source === 'RAYDIUM' ||
-    tx.source === 'ORCA'
+    tx.source === 'ORCA' ||
+    tx.source === 'PUMP_FUN' ||
+    tx.source === 'METEORA' ||
+    tx.source === 'MOONSHOT' ||
+    tx.source === 'BONKSWAP'
   ) {
     return true;
   }
