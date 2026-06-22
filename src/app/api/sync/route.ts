@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getConfig } from '@/lib/config';
 import { prisma } from '@/lib/prisma';
-import { fetchRecentSignatures } from '@/lib/solana';
+import { fetchRecentSignatures, getWalletBalance } from '@/lib/solana';
 import { fetchParsedTransactions } from '@/lib/helius';
-import { classifyTransaction } from '@/lib/transaction-classifier';
-import { bundleTrades, type ClassifiedSwap } from '@/lib/trade-bundler';
+import { classifyTransaction, extractSwapDetails } from '@/lib/transaction-classifier';
 import { calculateMetrics } from '@/lib/metrics-calculator';
-import { getWalletBalance } from '@/lib/solana';
-import { getSolPrice } from '@/lib/dexscreener';
-import { getTokenData } from '@/lib/dexscreener';
-import { extractSwapDetails } from '@/lib/transaction-classifier';
+import { getSolPrice, getTokenData } from '@/lib/dexscreener';
 import type { HeliusTransaction, TransactionType } from '@/types';
 
 interface ClassifiedEntry {
@@ -134,92 +130,130 @@ async function handleSync(): Promise<NextResponse> {
       }
     }
 
-    // 5. Bundle trades — resolve token symbols via DexScreener
-    const swaps: ClassifiedSwap[] = [];
+    // 5. Process swaps — match sells to existing open trades in DB
     const tokenNameCache = new Map<string, { symbol: string; name: string | null }>();
+    let tradesCreated = 0;
+    let tradesClosed = 0;
 
     for (const entry of classified) {
-      if (entry.type === 'SWAP') {
-        const details = extractSwapDetails(entry.tx, config);
-        if (details) {
-          // Resolve token name/symbol
-          let tokenInfo = tokenNameCache.get(details.tokenMint);
-          if (!tokenInfo) {
-            try {
-              const tokenData = await getTokenData(details.tokenMint);
-              tokenInfo = {
-                symbol: tokenData?.symbol || 'UNKNOWN',
-                name: tokenData?.name || null,
-              };
-            } catch {
-              tokenInfo = { symbol: 'UNKNOWN', name: null };
-            }
-            tokenNameCache.set(details.tokenMint, tokenInfo);
-          }
+      if (entry.type !== 'SWAP') continue;
+      
+      const details = extractSwapDetails(entry.tx, config);
+      if (!details) continue;
 
-          swaps.push({
-            signature: entry.tx.signature,
-            timestamp: entry.tx.timestamp,
-            direction: details.direction,
-            tokenMint: details.tokenMint,
-            tokenSymbol: tokenInfo.symbol,
-            tokenName: tokenInfo.name,
-            solAmount: details.solAmount,
-            tokenAmount: details.tokenAmount,
-            marketCap: null,
-            price: null,
-            memo: details.memo,
+      // Resolve token name/symbol
+      let tokenInfo = tokenNameCache.get(details.tokenMint);
+      if (!tokenInfo) {
+        try {
+          const tokenData = await getTokenData(details.tokenMint);
+          tokenInfo = {
+            symbol: tokenData?.symbol || 'UNKNOWN',
+            name: tokenData?.name || null,
+          };
+        } catch {
+          tokenInfo = { symbol: 'UNKNOWN', name: null };
+        }
+        tokenNameCache.set(details.tokenMint, tokenInfo);
+      }
+
+      const txRecord = await prisma.transaction.findUnique({
+        where: { signature: entry.tx.signature },
+        select: { id: true },
+      });
+
+      if (details.direction === 'BUY') {
+        // Check if we already have a trade for this buy tx
+        const existingBuyTrade = txRecord ? await prisma.trade.findFirst({
+          where: { entryTxId: txRecord.id },
+        }) : null;
+
+        if (!existingBuyTrade) {
+          await prisma.trade.create({
+            data: {
+              tokenMint: details.tokenMint,
+              tokenSymbol: tokenInfo.symbol,
+              tokenName: tokenInfo.name,
+              action: 'OPEN',
+              entryTxId: txRecord?.id ?? null,
+              entryTimestamp: entry.tx.timestamp,
+              entrySolAmount: details.solAmount,
+              entryMarketCap: null,
+              entryPrice: null,
+              exitTxId: null,
+              exitTimestamp: null,
+              exitSolAmount: null,
+              exitMarketCap: null,
+              exitPrice: null,
+              netPnlSol: null,
+              roiPercent: null,
+              holdDurationSec: null,
+              archiveTag: null,
+              traderMemo: details.memo,
+            },
           });
+          tradesCreated++;
+        }
+      } else if (details.direction === 'SELL') {
+        // Find an existing OPEN trade for this token
+        const openTrade = await prisma.trade.findFirst({
+          where: {
+            tokenMint: details.tokenMint,
+            action: 'OPEN',
+          },
+          orderBy: { entryTimestamp: 'asc' }, // FIFO — close oldest first
+        });
+
+        if (openTrade) {
+          // Close the trade with exit data
+          const netPnl = details.solAmount - openTrade.entrySolAmount;
+          const roi = openTrade.entrySolAmount > 0
+            ? ((details.solAmount - openTrade.entrySolAmount) / openTrade.entrySolAmount) * 100
+            : 0;
+          const holdDuration = entry.tx.timestamp - openTrade.entryTimestamp;
+          const archiveTag = roi >= 1000 ? 'HIMOTHY' : roi > 0 ? 'PROFIT' : 'REKT';
+
+          await prisma.trade.update({
+            where: { id: openTrade.id },
+            data: {
+              action: 'CLOSED',
+              exitTxId: txRecord?.id ?? null,
+              exitTimestamp: entry.tx.timestamp,
+              exitSolAmount: details.solAmount,
+              netPnlSol: Math.round(netPnl * 10000) / 10000,
+              roiPercent: Math.round(roi * 100) / 100,
+              holdDurationSec: holdDuration,
+              archiveTag,
+            },
+          });
+          tradesClosed++;
+        } else {
+          // Orphan sell — no matching buy found, record as closed trade
+          await prisma.trade.create({
+            data: {
+              tokenMint: details.tokenMint,
+              tokenSymbol: tokenInfo.symbol,
+              tokenName: tokenInfo.name,
+              action: 'CLOSED',
+              entryTxId: null,
+              entryTimestamp: entry.tx.timestamp,
+              entrySolAmount: 0,
+              entryMarketCap: null,
+              entryPrice: null,
+              exitTxId: txRecord?.id ?? null,
+              exitTimestamp: entry.tx.timestamp,
+              exitSolAmount: details.solAmount,
+              exitMarketCap: null,
+              exitPrice: null,
+              netPnlSol: details.solAmount,
+              roiPercent: null,
+              holdDurationSec: 0,
+              archiveTag: 'PROFIT',
+              traderMemo: details.memo,
+            },
+          });
+          tradesCreated++;
         }
       }
-    }
-
-    const bundles = bundleTrades(swaps);
-
-    // Dedup: check if trades with these entry signatures already exist
-    for (const bundle of bundles) {
-      const existingTrade = await prisma.trade.findFirst({
-        where: {
-          entryTxId: bundle.entrySignature
-            ? (await prisma.transaction.findUnique({ where: { signature: bundle.entrySignature }, select: { id: true } }))?.id
-            : undefined,
-        },
-      });
-
-      if (existingTrade) continue; // Skip duplicate trade
-
-      const entryTx = await prisma.transaction.findUnique({
-        where: { signature: bundle.entrySignature },
-      });
-      const exitTx = bundle.exitSignature
-        ? await prisma.transaction.findUnique({
-            where: { signature: bundle.exitSignature },
-          })
-        : null;
-
-      await prisma.trade.create({
-        data: {
-          tokenMint: bundle.tokenMint,
-          tokenSymbol: bundle.tokenSymbol,
-          tokenName: bundle.tokenName,
-          action: bundle.action,
-          entryTxId: entryTx?.id ?? null,
-          entryTimestamp: bundle.entryTimestamp,
-          entrySolAmount: bundle.entrySolAmount,
-          entryMarketCap: null,
-          entryPrice: null,
-          exitTxId: exitTx?.id ?? null,
-          exitTimestamp: bundle.exitTimestamp,
-          exitSolAmount: bundle.exitSolAmount,
-          exitMarketCap: null,
-          exitPrice: null,
-          netPnlSol: bundle.netPnlSol,
-          roiPercent: bundle.roiPercent,
-          holdDurationSec: bundle.holdDurationSec,
-          archiveTag: bundle.archiveTag,
-          traderMemo: bundle.traderMemo,
-        },
-      });
     }
 
     // 6. Recalculate global metrics
@@ -238,7 +272,8 @@ async function handleSync(): Promise<NextResponse> {
       {
         message: 'Sync complete',
         synced: storedCount,
-        tradesCreated: bundles.length,
+        tradesCreated,
+        tradesClosed,
       },
       { headers: { 'Cache-Control': 'no-store' } },
     );
