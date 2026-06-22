@@ -76,16 +76,12 @@ function isBurnTransaction(tx: HeliusTransaction, config: AppConfig): boolean {
 }
 
 function isSwapTransaction(tx: HeliusTransaction): boolean {
-  // Check if source is Jupiter or other DEX
-  if (
-    tx.source === 'JUPITER' ||
-    tx.source === 'RAYDIUM' ||
-    tx.source === 'ORCA' ||
-    tx.source === 'PUMP_FUN' ||
-    tx.source === 'METEORA' ||
-    tx.source === 'MOONSHOT' ||
-    tx.source === 'BONKSWAP'
-  ) {
+  // Check if source is a known DEX
+  const DEX_SOURCES = [
+    'JUPITER', 'RAYDIUM', 'ORCA', 'PUMP_FUN', 'PUMP_AMM',
+    'METEORA', 'MOONSHOT', 'BONKSWAP', 'LIFINITY', 'ALDRIN',
+  ];
+  if (DEX_SOURCES.includes(tx.source)) {
     return true;
   }
 
@@ -93,7 +89,6 @@ function isSwapTransaction(tx: HeliusTransaction): boolean {
   const hasJupiterInstruction = tx.instructions.some(
     (ix) => ix.programId === JUPITER_PROGRAM_ID
   );
-
   if (hasJupiterInstruction) return true;
 
   // Check for swap events
@@ -104,6 +99,14 @@ function isSwapTransaction(tx: HeliusTransaction): boolean {
   // Check Helius type
   if (tx.type === 'SWAP') {
     return true;
+  }
+
+  // Fallback: if source is a DEX-like source and has both SOL + token movement,
+  // treat it as a swap even if Helius typed it as UNKNOWN
+  if (tx.source.includes('PUMP') || tx.source.includes('SWAP') || tx.source.includes('AMM')) {
+    const hasTokenTransfer = tx.tokenTransfers.length > 0;
+    const hasNativeTransfer = tx.nativeTransfers.some(t => t.amount > 1_000_000); // > 0.001 SOL
+    if (hasTokenTransfer && hasNativeTransfer) return true;
   }
 
   return false;
