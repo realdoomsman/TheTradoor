@@ -2,14 +2,18 @@ import type { AppConfig } from '@/types';
 
 /**
  * Reads process.env and returns a typed AppConfig.
- * Demo mode is activated when the Helius API key is still a placeholder or suspended.
- * Wallet balance + SOL price can work without Helius (via public RPC + DexScreener).
+ * Demo mode activates when any critical piece is missing:
+ * - Helius API key
+ * - Master wallet address
+ * - TRADOOR token mint address
+ * 
+ * Wallet balance + SOL price still work in demo mode (via public RPC).
  */
 export function getConfig(): AppConfig {
   const heliusApiKey = process.env.HELIUS_API_KEY || '<placeholder>';
   const walletAddress = process.env.MASTER_WALLET_ADDRESS || '';
+  const tradoorMint = process.env.TRADOOR_TOKEN_MINT || '';
 
-  // Only fully live when we have a real Helius key AND wallet
   const hasRealHelius =
     !!heliusApiKey &&
     heliusApiKey !== '<placeholder>' &&
@@ -20,13 +24,25 @@ export function getConfig(): AppConfig {
     walletAddress !== '<MASTER_WALLET_PUBKEY>' &&
     walletAddress.length > 30;
 
-  // Demo mode for trade parsing (needs Helius enhanced API)
-  // But wallet balance works regardless (uses public RPC fallback)
-  const isDemoMode = !hasRealHelius || !hasRealWallet;
+  const hasRealMint =
+    !!tradoorMint &&
+    tradoorMint !== '<TRADOOR_MINT_ADDRESS>' &&
+    tradoorMint.length > 30;
+
+  // All three must be real for live mode
+  const isDemoMode = !hasRealHelius || !hasRealWallet || !hasRealMint;
+
+  if (isDemoMode && typeof globalThis !== 'undefined') {
+    const reasons = [];
+    if (!hasRealHelius) reasons.push('HELIUS_API_KEY');
+    if (!hasRealWallet) reasons.push('MASTER_WALLET_ADDRESS');
+    if (!hasRealMint) reasons.push('TRADOOR_TOKEN_MINT');
+    console.log(`[config] Demo mode — missing: ${reasons.join(', ')}`);
+  }
 
   return {
     masterWalletAddress: walletAddress,
-    tradoorTokenMint: process.env.TRADOOR_TOKEN_MINT || '',
+    tradoorTokenMint: tradoorMint,
     burnAddress:
       process.env.BURN_ADDRESS ||
       '1nc1nerator11111111111111111111111111111111',

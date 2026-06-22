@@ -7,26 +7,47 @@ const globalForPrisma = globalThis as unknown as {
 
 /**
  * Singleton Prisma client.
- * Falls back gracefully in serverless environments where better-sqlite3
- * native module is not available (e.g. Vercel).
+ * Uses libSQL/Turso in production, better-sqlite3 for local dev.
  */
 function createPrismaClient(): PrismaClient | null {
+  const tursoUrl = process.env.TURSO_DATABASE_URL;
+  const tursoToken = process.env.TURSO_AUTH_TOKEN;
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // Production: use Turso/libSQL (skip in dev to avoid Turbopack issues)
+  if (isProduction && tursoUrl && tursoToken) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createClient } = require('@libsql/client');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { PrismaLibSQL } = require('@prisma/adapter-libsql');
+
+      const libsql = createClient({ url: tursoUrl, authToken: tursoToken });
+      const adapter = new PrismaLibSQL(libsql);
+
+      console.log('[prisma] Connected to Turso (production)');
+      return new PrismaClient({ adapter, log: ['error'] });
+    } catch (err) {
+      console.error('[prisma] Turso connection failed:', err);
+      return null;
+    }
+  }
+
+  // Local dev: use better-sqlite3
   try {
-    // Dynamic import to avoid build-time failure when native module isn't available
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
     const adapter = new PrismaBetterSqlite3({
       url: process.env.DATABASE_URL || 'file:./prisma/dev.db',
     });
 
+    console.log('[prisma] Connected to local SQLite (dev)');
     return new PrismaClient({
       adapter,
       log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
     });
   } catch {
-    // Native module not available (serverless environment)
-    // App will use demo data fallbacks
-    console.warn('[prisma] better-sqlite3 not available — using demo mode');
+    console.warn('[prisma] No database adapter available — using demo mode');
     globalForPrisma.prismaFailed = true;
     return null;
   }
@@ -37,7 +58,7 @@ function getPrisma(): PrismaClient | null {
   if (globalForPrisma.prisma) return globalForPrisma.prisma;
 
   const client = createPrismaClient();
-  if (client && process.env.NODE_ENV !== 'production') {
+  if (client) {
     globalForPrisma.prisma = client;
   }
   return client;
