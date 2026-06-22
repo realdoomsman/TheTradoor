@@ -51,7 +51,7 @@ const FAQS: FaqItem[] = [
 ];
 
 const LINKS = [
-  { label: 'GitHub', url: 'https://github.com/TheTradoor', icon: 'git' },
+  { label: 'GitHub', url: 'https://github.com/realdoomsman/TheTradoor', icon: 'git' },
   { label: 'X / Twitter', url: 'https://x.com/thetradoorfun', icon: '@' },
   { label: 'Solscan (wallet)', url: 'https://solscan.io/account/HCipnpNx12fNQGB8A12Xp7m4eX2yTYziXf7UATgWbKgX', icon: '>' },
   { label: 'Dashboard', url: 'https://thetradoor.vercel.app', icon: '#' },
